@@ -1,0 +1,11 @@
+{
+  "source": "official_schedule_source",
+  "sync_every_minutes": 15,
+  "steps": [
+    "extract",
+    "normalize",
+    "compare",
+    "update_local_db",
+    "trigger_notifications_if_changed"
+  ]
+}
