@@ -1,0 +1,211 @@
+{
+  "name": "Ingestion horaires (version guide pro)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-001",
+      "name": "Schedule 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://api:8000/n8n/official-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "dev-n8n-secret"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-source-002",
+      "name": "Source officielle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const src = ($json.events || []).map((e) => ({\n  ...e,\n  matiere: String(e.matiere || '').trim(),\n  groupe: String(e.groupe || '').trim().toUpperCase(),\n  salle: String(e.salle || '').trim().toUpperCase().replace(/\\s+/g, ''),\n  enseignant: String(e.enseignant || '').trim()\n}));\n\nreturn [{ json: { events: src, has_changes: src.length > 0 } }];"
+      },
+      "id": "code-normalize-003",
+      "name": "Normaliser données",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.has_changes}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "if-changes-004",
+      "name": "Changements ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/n8n/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-Secret",
+              "value": "dev-n8n-secret"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"events\": $json.events } }}",
+        "options": {}
+      },
+      "id": "http-ingest-005",
+      "name": "Upsert API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "",
+        "options": {}
+      },
+      "id": "exec-notif-006",
+      "name": "Execute notifications",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        -80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "noop-stop-007",
+      "name": "Aucun changement",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        920,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule 15 min": {
+      "main": [
+        [
+          {
+            "node": "Source officielle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Source officielle": {
+      "main": [
+        [
+          {
+            "node": "Normaliser données",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser données": {
+      "main": [
+        [
+          {
+            "node": "Changements ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Changements ?": {
+      "main": [
+        [
+          {
+            "node": "Upsert API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aucun changement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert API": {
+      "main": [
+        [
+          {
+            "node": "Execute notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}

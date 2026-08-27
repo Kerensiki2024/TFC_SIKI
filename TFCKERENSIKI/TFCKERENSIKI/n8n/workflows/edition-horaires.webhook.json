@@ -1,0 +1,162 @@
+{
+  "name": "Edition horaires (Webhook + validation)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "edition-horaire",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-edit-001",
+      "name": "Webhook édition",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "edition-horaire"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $json.body ?? $json;\nconst role = String(body.user_role || 'student').toLowerCase();\nconst action = String(body.action || '').toLowerCase();\nconst allowed = {\n  admin: ['change_room', 'change_time', 'delete_course', 'annuler'],\n  teacher: ['change_room', 'change_time'],\n  agent: ['change_room', 'change_time', 'annuler'],\n  student: []\n};\n\nif (!allowed[role] || !allowed[role].includes(action)) {\n  return [{ json: { authorized: false, message: `Permission refusée pour ${role} sur ${action}` } }];\n}\n\nreturn [{ json: { authorized: true, action, role, payload: body } }];"
+      },
+      "id": "code-auth-002",
+      "name": "Validation permissions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.authorized}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "if-authorized-003",
+      "name": "Autorisé ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const p = $json.payload || {};\nconst changeType = String($json.action || 'change_room');\nconst isCritical = changeType === 'delete_course' || changeType === 'annuler';\nconst sensitivity = isCritical ? 2 : 1;\nreturn [{ json: { ...$json, sensitivity, status: sensitivity === 1 ? 'approved' : 'pending_validation' } }];"
+      },
+      "id": "code-sensitivity-004",
+      "name": "Niveau sensibilité",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, validation: $json.status, sensitivity: $json.sensitivity, action: $json.action }) }}"
+      },
+      "id": "respond-ok-005",
+      "name": "Répondre OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.message || 'Permission refusée' }) }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "respond-forbidden-006",
+      "name": "Répondre refus",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook édition": {
+      "main": [
+        [
+          {
+            "node": "Validation permissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation permissions": {
+      "main": [
+        [
+          {
+            "node": "Autorisé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autorisé ?": {
+      "main": [
+        [
+          {
+            "node": "Niveau sensibilité",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Répondre refus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Niveau sensibilité": {
+      "main": [
+        [
+          {
+            "node": "Répondre OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}

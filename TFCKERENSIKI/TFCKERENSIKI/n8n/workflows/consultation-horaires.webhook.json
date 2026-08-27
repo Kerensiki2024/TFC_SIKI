@@ -1,0 +1,102 @@
+{
+  "name": "Consultation horaires (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "consultation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-consult-001",
+      "name": "Webhook consultation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "consultation-horaires"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $json.body ?? $json;\nconst q = String(body.type_requete || 'planning_jour').toLowerCase();\nlet message = \"Mes cours aujourd'hui\";\nif (q === 'planning_semaine') message = 'Montre-moi ma semaine';\nif (q === 'prochain_cours') message = 'Quel est mon prochain cours ?';\nconst email = String(body.email_demo || 'kerensiki@gmail.com').toLowerCase();\nconst password = String(body.password_demo || 'Makula@123');\nreturn [{ json: { message, login: { email, password }, type_requete: q } }];"
+      },
+      "id": "code-prepare-002",
+      "name": "Préparer message + login",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/auth/login",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.login }}",
+        "options": {}
+      },
+      "id": "http-login-003",
+      "name": "POST /auth/login",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $('Préparer message + login').item.json.message }) }}",
+        "options": {}
+      },
+      "id": "http-chat-004",
+      "name": "POST /chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, reponse: $json.reply, intent: $json.intent }) }}"
+      },
+      "id": "respond-consult-005",
+      "name": "Répondre Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1040, 0]
+    }
+  ],
+  "connections": {
+    "Webhook consultation": {
+      "main": [[{ "node": "Préparer message + login", "type": "main", "index": 0 }]]
+    },
+    "Préparer message + login": {
+      "main": [[{ "node": "POST /auth/login", "type": "main", "index": 0 }]]
+    },
+    "POST /auth/login": {
+      "main": [[{ "node": "POST /chat", "type": "main", "index": 0 }]]
+    },
+    "POST /chat": {
+      "main": [[{ "node": "Répondre Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true },
+  "pinData": {}
+}

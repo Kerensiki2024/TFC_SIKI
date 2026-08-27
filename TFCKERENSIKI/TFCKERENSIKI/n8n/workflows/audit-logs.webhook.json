@@ -1,0 +1,82 @@
+{
+  "name": "Audit logs (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "audit-log",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-audit-001",
+      "name": "Webhook audit",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "audit-log"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json.body ?? $json;\nconst now = new Date().toISOString();\nconst txt = JSON.stringify(raw);\nlet hash = 0;\nfor (let i = 0; i < txt.length; i++) {\n  hash = ((hash << 5) - hash) + txt.charCodeAt(i);\n  hash |= 0;\n}\n\nreturn [{\n  json: {\n    event_type: raw.event_type || 'unknown',\n    entity_type: raw.entity_type || 'unknown',\n    entity_id: raw.entity_id || null,\n    user_id: raw.user_id || null,\n    metadata: raw.metadata || {},\n    created_at: now,\n    integrity_hash: String(hash)\n  }\n}];"
+      },
+      "id": "code-enrich-002",
+      "name": "Enrichir log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, log: $json }) }}"
+      },
+      "id": "respond-audit-003",
+      "name": "Répondre log",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        540,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook audit": {
+      "main": [
+        [
+          {
+            "node": "Enrichir log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrichir log": {
+      "main": [
+        [
+          {
+            "node": "Répondre log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}

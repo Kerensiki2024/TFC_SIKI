@@ -1,0 +1,61 @@
+# Stack locale : PostgreSQL + n8n + API FastAPI (chatbot horaires L3GIN).
+# Commande typique : docker compose up --build
+# Données DB persistantes dans le volume `pgdata` (supprimer avec down -v pour repartir à zéro).
+services:
+  # Base de données : l’API s’y connecte via DATABASE_URL (asyncpg).
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: horaires
+      POSTGRES_PASSWORD: horaires_secret
+      POSTGRES_DB: horaires
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U horaires -d horaires"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Automatisation (workflows) : webhooks, ingestion horaire, notifications.
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Paris
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Backend REST : /auth/*, /chat, /n8n/*, /health.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # URL async SQLAlchemy (nom d’hôte `db` = service Docker).
+      DATABASE_URL: postgresql+asyncpg://horaires:horaires_secret@db:5432/horaires
+      # Appelé après annulation de cours côté chat (démo).
+      N8N_WEBHOOK_EDIT: http://n8n:5678/webhook/edit-schedule
+      # Clé partagée API ↔ n8n pour les routes /n8n/* (en-tête X-N8N-Secret).
+      N8N_INTERNAL_SECRET: dev-n8n-secret
+      # Signature des JWT ; à changer impérativement en production.
+      JWT_SECRET: dev-super-secret-change-me
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata: # données PostgreSQL
+  n8n_data: # workflows et config n8n

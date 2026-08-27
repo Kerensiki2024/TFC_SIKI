@@ -1,0 +1,73 @@
+{
+  "name": "Notifications changements (Execute Workflow)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-exec-001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $json;\nconst groupName = String(input.group_name || 'L1-INFO-A');\nconst changeType = String(input.type || 'update');\nconst course = String(input.course_name || 'Cours');\n\nconst recipients = [\n  { email: 'student1@demo.local', first_name: 'Alice' },\n  { email: 'student2@demo.local', first_name: 'Bob' }\n];\n\nconst out = recipients.map((s) => {\n  let body = `Bonjour ${s.first_name},\\n\\n`;\n  if (changeType === 'cancellation') {\n    body += `Le cours ${course} est annulé.`;\n  } else if (changeType === 'room_change') {\n    body += `Le cours ${course} a changé de salle.`;\n  } else {\n    body += `Un changement a été effectué pour ${course}.`;\n  }\n  body += `\\n\\nGroupe: ${groupName}\\n\\nService scolarité`;\n\n  return {\n    json: {\n      to: s.email,\n      subject: `Changement d'emploi du temps - ${course}`,\n      body,\n      status: 'prepared'\n    }\n  };\n});\n\nreturn out;"
+      },
+      "id": "code-build-mails-002",
+      "name": "Générer messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "done-output-003",
+      "name": "Sortie préparation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Générer messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Générer messages": {
+      "main": [
+        [
+          {
+            "node": "Sortie préparation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}
