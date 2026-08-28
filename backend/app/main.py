@@ -29,7 +29,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 # Autorise le front Vite (5173) à appeler l’API avec cookies / Authorization si besoin.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://tfckerensiki-frontend.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
