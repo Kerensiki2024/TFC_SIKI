@@ -263,7 +263,22 @@ async def chat_message(
             )
 
     role = user.role
-
+    # --- Salutation : message d'accueil adapté au rôle ---
+    if parsed.name == "salutation":
+        if role in ("AGENT", "RESPONSABLE"):
+            exemples = (
+                "« Annule le cours de X groupe Y », « Déplace le cours de X demain », "
+                "« Mets le cours de X en salle H »"
+            )
+        else:
+            exemples = (
+                "« Quel est mon prochain cours ? », « Mes cours aujourd'hui », "
+                "« Montre-moi ma semaine »"
+            )
+        return ChatResponse(
+            reply=f"Bonjour ! Je peux t'aider avec les horaires. Essaie par exemple : {exemples}.",
+            intent=parsed.name,
+        )
     # --- Consultation : prochain cours ---
     if parsed.name == "prochain_cours":
         g = _user_groupe(user)
