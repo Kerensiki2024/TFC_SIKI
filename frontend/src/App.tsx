@@ -1,12 +1,13 @@
 /**
- * Interface chat (point 3) : login JWT (/auth/login), messages /chat avec Bearer,
- * persistance historique (localStorage) et session (sessionStorage).
+ * Interface chat (point 3) : login JWT (/auth/login), inscription (/auth/register),
+ * messages /chat avec Bearer, persistance historique (localStorage) et session (sessionStorage).
  * Au montage : GET /auth/me si un token existe déjà (validation sans boucle sur le JWT).
  * Cartes cours : lignes bot commençant par « — » (aligné sur _fmt_ev côté API).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type BackendStatus = "checking" | "online" | "offline";
+type AuthMode = "login" | "register";
 type CourseCard = {
   matiere: string;
   type: string;
@@ -59,8 +60,19 @@ function parseCoursesFromReply(reply: string): CourseCard[] {
 }
 
 export function App() {
-  const [email, setEmail] = useState("kerensiki@gmail.com");
-  const [password, setPassword] = useState("Makula@123");
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+
+  // --- Connexion ---
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // --- Inscription ---
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regGroupe, setRegGroupe] = useState("");
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
   const [token, setToken] = useState<string | null>(() => sessionStorage.getItem(TOKEN_KEY));
   const [authUser, setAuthUser] = useState<AuthUser | null>(() => {
     try {
@@ -72,7 +84,6 @@ export function App() {
   });
   const [input, setInput] = useState("");
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("checking");
-  const [authError, setAuthError] = useState<string | null>(null);
   const [lines, setLines] = useState<ChatLine[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -127,6 +138,19 @@ export function App() {
     ];
   }, [authUser?.role]);
 
+  const applyAuthResult = useCallback(
+    (data: { access_token: string; email: string; role: string; groupe: string | null }) => {
+      setToken(data.access_token);
+      sessionStorage.setItem(TOKEN_KEY, data.access_token);
+      const user = { email: data.email, role: data.role, groupe: data.groupe };
+      setAuthUser(user);
+      sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+      setLines([{ who: "bot", text: WELCOME_MESSAGE }]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([{ who: "bot", text: WELCOME_MESSAGE }]));
+    },
+    [],
+  );
+
   const login = useCallback(async () => {
     // POST /auth/login → stocke JWT + profil minimal pour l’UI.
     setAuthError(null);
@@ -146,18 +170,38 @@ export function App() {
         role: string;
         groupe: string | null;
       };
-      setToken(data.access_token);
-      sessionStorage.setItem(TOKEN_KEY, data.access_token);
-      const user = { email: data.email, role: data.role, groupe: data.groupe };
-      setAuthUser(user);
-      sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-      setLines([{ who: "bot", text: WELCOME_MESSAGE }]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([{ who: "bot", text: WELCOME_MESSAGE }]));
+      applyAuthResult(data);
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
       setAuthError(err);
     }
-  }, [email, password]);
+  }, [email, password, applyAuthResult]);
+
+  const register = useCallback(async () => {
+    // POST /auth/register → crée le compte étudiant, puis connecte automatiquement.
+    setRegisterError(null);
+    try {
+      const r = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regEmail, password: regPassword, groupe: regGroupe }),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || "Inscription refusée");
+      }
+      const data = (await r.json()) as {
+        access_token: string;
+        email: string;
+        role: string;
+        groupe: string | null;
+      };
+      applyAuthResult(data);
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      setRegisterError(err);
+    }
+  }, [regEmail, regPassword, regGroupe, applyAuthResult]);
 
   const logout = useCallback(() => {
     setToken(null);
@@ -283,9 +327,8 @@ export function App() {
       <header className="header">
         <h1>Chatbot horaires — L3GIN</h1>
         <p className="sub">
-          Université de Kinshasa, Faculté Polytechnique — démo : FastAPI, PostgreSQL, n8n.
-          Connexion avec l’e-mail du formulaire L3GIN ; mot de passe = <strong>Nom@123</strong> (Nom
-          tel que sur le formulaire).
+          Université de Kinshasa, Faculté Polytechnique — assistant conversationnel des horaires
+          de cours (FastAPI, PostgreSQL, n8n).
         </p>
         <div className={`backend ${backendStatus}`}>
           {backendStatus === "checking" && "Vérification du backend..."}
@@ -293,62 +336,95 @@ export function App() {
           {backendStatus === "offline" && "Backend indisponible (vérifie Docker/API)"}
         </div>
         {!token && (
-          <div className="auth-box">
-            <label className="sr-only" htmlFor="email-login">
-              Adresse e-mail
-            </label>
-            <input
-              id="email-login"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email"
-            />
-            <label className="sr-only" htmlFor="password-login">
-              Mot de passe
-            </label>
-            <input
-              id="password-login"
-              value={password}
-              type="password"
-              autoComplete="current-password"
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="mot de passe"
-            />
-            <button type="button" onClick={() => void login()}>
-              Se connecter
-            </button>
-            <div className="quick">
+          <>
+            <div className="auth-tabs">
               <button
                 type="button"
-                onClick={() => {
-                  setEmail("kerensiki@gmail.com");
-                  setPassword("Makula@123");
-                }}
+                className={authMode === "login" ? "active" : ""}
+                onClick={() => setAuthMode("login")}
               >
-                Remplir (Keren — Makula@123)
+                Se connecter
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setEmail("sharobukasa2003@gmail.com");
-                  setPassword("Mukanya@123");
-                }}
+                className={authMode === "register" ? "active" : ""}
+                onClick={() => setAuthMode("register")}
               >
-                Remplir (Sharon — Mukanya@123)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("bob.agent@univ.demo");
-                  setPassword("bob123");
-                }}
-              >
-                Remplir compte agent
+                Créer un compte
               </button>
             </div>
-            {authError && <p className="auth-error">Login échoué: {authError}</p>}
-          </div>
+
+            {authMode === "login" && (
+              <div className="auth-box">
+                <label className="sr-only" htmlFor="email-login">
+                  Adresse e-mail
+                </label>
+                <input
+                  id="email-login"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email"
+                />
+                <label className="sr-only" htmlFor="password-login">
+                  Mot de passe
+                </label>
+                <input
+                  id="password-login"
+                  value={password}
+                  type="password"
+                  autoComplete="current-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="mot de passe"
+                />
+                <button type="button" onClick={() => void login()}>
+                  Se connecter
+                </button>
+                {authError && <p className="auth-error">Connexion échouée : {authError}</p>}
+              </div>
+            )}
+
+            {authMode === "register" && (
+              <div className="register-box">
+                <label className="sr-only" htmlFor="email-register">
+                  Adresse e-mail
+                </label>
+                <input
+                  id="email-register"
+                  autoComplete="username"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="email"
+                />
+                <label className="sr-only" htmlFor="password-register">
+                  Mot de passe
+                </label>
+                <input
+                  id="password-register"
+                  value={regPassword}
+                  type="password"
+                  autoComplete="new-password"
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="mot de passe (6 caractères min.)"
+                />
+                <label className="sr-only" htmlFor="groupe-register">
+                  Groupe / promotion
+                </label>
+                <input
+                  id="groupe-register"
+                  value={regGroupe}
+                  onChange={(e) => setRegGroupe(e.target.value)}
+                  placeholder="groupe (ex. L3GIN)"
+                />
+                <button type="button" onClick={() => void register()}>
+                  Créer mon compte
+                </button>
+                {registerError && (
+                  <p className="auth-error">Inscription échouée : {registerError}</p>
+                )}
+              </div>
+            )}
+          </>
         )}
         {token && authUser && (
           <div className="session">
