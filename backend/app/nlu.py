@@ -28,7 +28,10 @@ _CONFIRM_NO = re.compile(
     r"^\s*(non|annul|stop|erreur)\s*[!.?]?\s*$",
     re.I,
 )
-
+_GREETING = re.compile(
+    r"^\s*(bonjour|bonsoir|salut|coucou|bsr|hello|hi|hey|cc)\s*[!.,]?\s*$",
+    re.I,
+)
 
 def _groupe_matiere_from_phrase(text: str, low_text: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
@@ -73,7 +76,10 @@ def parse(message: str) -> ParsedIntent:
     """
     m = message.strip()
     low = m.lower()
-
+    if _GREETING.match(m):
+        return ParsedIntent("salutation", {}, m)
+    if _CONFIRM_NO.match(m):
+        return ParsedIntent("confirm_no", {}, m)
     if _CONFIRM_YES.match(m):
         return ParsedIntent("confirm_yes", {}, m)
     if _CONFIRM_NO.match(m):
