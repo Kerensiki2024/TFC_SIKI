@@ -535,6 +535,83 @@ body {
   cursor: default;
 }
 
+/* ---------- Onglets connexion / inscription ---------- */
+.auth-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.auth-tabs button {
+  flex: 1;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--ink-dim);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.auth-tabs button.active {
+  background: var(--amber);
+  color: #1a1305;
+  border-color: var(--amber);
+  font-weight: 600;
+}
+
+.register-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.7fr auto;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.register-box input {
+  border: 1px solid var(--panel-border);
+  background: var(--board-bg);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
+.register-box input::placeholder {
+  color: var(--ink-faint);
+}
+
+.register-box input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+.register-box button {
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--amber);
+  color: #1a1305;
+  padding: 0 1rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: background-color 0.15s ease;
+}
+
+.register-box button:hover {
+  background: var(--amber-soft);
+}
+
+@media (max-width: 560px) {
+  .register-box {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 560px) {
   .layout {
